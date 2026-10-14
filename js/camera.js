@@ -1,0 +1,2 @@
+'use strict';
+class Camera{constructor(){this.x=0;this.y=0;this.zoom=1;}reset(l,vw,vh){const fit=Math.min(vw/1100,vh/720);this.zoom=fit;this.x=0;this.y=0;}update(dt,l,vw,vh){const[a,b]=l.players;const center=(a.x+b.x)/2+15;const spread=Math.abs(a.x-b.x);const desired=Math.min(vw/Math.max(1050,spread+330),vh/720);const rate=1-Math.exp(-dt*4);this.zoom+=(desired-this.zoom)*rate;const viewW=vw/this.zoom;const targetX=Math.max(0,Math.min(l.width-viewW,center-viewW/2));this.x+=(targetX-this.x)*rate;this.y=0;}}

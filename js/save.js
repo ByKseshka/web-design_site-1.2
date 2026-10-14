@@ -1,0 +1,9 @@
+'use strict';
+class SaveManager{
+ constructor(){this.key='shadow-light-v1';this.data=this.loadGame();}
+ fresh(){return {version:1,currentLevel:1,unlockedLevels:[1],completedLevels:[],stars:{},scores:{},bestTimes:{},totalScore:0,settings:{music:true,sound:true,volume:.55}};}
+ loadGame(){try{const d=JSON.parse(localStorage.getItem(this.key));if(!d||d.version!==1||!Array.isArray(d.completedLevels)||!d.settings)return this.fresh();const clean=this.fresh();const done=d.completedLevels.filter(n=>Number.isInteger(n)&&n>=1&&n<=15);let frontier=1;while(done.includes(frontier)&&frontier<15)frontier++;clean.completedLevels=done.filter(n=>n<=frontier);clean.unlockedLevels=Array.from({length:frontier},(_,i)=>i+1);clean.currentLevel=Math.min(frontier,Math.max(1,Number(d.currentLevel)||1));for(const k of ['stars','scores','bestTimes'])for(const [n,v]of Object.entries(d[k]||{}))if(clean.completedLevels.includes(+n)&&Number.isFinite(v)&&v>=0)clean[k][n]=k==='stars'?Math.min(3,Math.floor(v)):v;clean.totalScore=Object.values(clean.scores).reduce((a,b)=>a+b,0);clean.settings={music:d.settings.music!==false,sound:d.settings.sound!==false,volume:Math.max(0,Math.min(1,Number.isFinite(d.settings.volume)?d.settings.volume:.55))};return clean;}catch{return this.fresh();}}
+ saveGame(){try{localStorage.setItem(this.key,JSON.stringify(this.data));return true;}catch{return false;}}
+ complete(id,stars,score,time){const d=this.data;if(!d.completedLevels.includes(id))d.completedLevels.push(id);if(id<15&&!d.unlockedLevels.includes(id+1))d.unlockedLevels.push(id+1);d.stars[id]=Math.max(d.stars[id]||0,stars);d.scores[id]=Math.max(d.scores[id]||0,score);d.bestTimes[id]=Math.min(d.bestTimes[id]||Infinity,time);d.currentLevel=Math.min(15,id+1);d.totalScore=Object.values(d.scores).reduce((a,b)=>a+b,0);this.saveGame();}
+ resetGame(){const settings={...this.data.settings};this.data=this.fresh();this.data.settings=settings;this.saveGame();}
+}

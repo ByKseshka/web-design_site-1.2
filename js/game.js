@@ -1,0 +1,18 @@
+'use strict';
+class Game{
+ constructor(){this.save=new SaveManager();this.audio=new AudioManager(this.save);this.input=new InputManager();this.levelManager=new LevelManager(this.save);this.renderer=new Renderer(document.getElementById('canvas'));this.camera=new Camera();this.state='menu';this.visualTime=0;this.accumulator=0;this.last=0;this.ui=null;this.pendingLevel=1;this.cutscene=null;this.level=null;this.input.onCommand=k=>this.command(k);this.input.onBlur=()=>{if(this.state==='playing')this.pause();};}
+ start(id,withScene=false){if(!this.levelManager.canPlay(id))return;this.audio.unlock();this.pendingLevel=id;this.input.clear();if(withScene||id===15&&!this.seenFinal){this.seenFinal=id===15;this.playScene(id===15?'final':'intro',()=>this.load(id));}else this.load(id);}
+ load(id){this.level=new Level(this.levelManager.get(id),this.audio,t=>this.ui.toast(t));this.camera.reset(this.level,this.renderer.w,this.renderer.h);this.state='playing';this.accumulator=0;this.input.clear();this.save.data.currentLevel=id;this.save.saveGame();this.ui.showGame();this.audio.play('transition');}
+ playScene(kind,done){this.state='cutscene';this.cutscene={kind,time:0,duration:kind==='final'?7:kind==='ending'?12:10,done};this.input.clear();this.ui.showCutscene();}
+ skipScene(){if(this.cutscene){const done=this.cutscene.done;this.cutscene=null;done();}}
+ pause(){if(this.state!=='playing')return;this.state='paused';this.input.clear();this.audio.silence();this.ui.pause();}
+ resume(){if(!this.level)return;this.state='playing';this.accumulator=0;this.input.clear();this.audio.apply();this.ui.showGame();}
+ menu(){this.state='menu';this.input.clear();this.audio.apply();this.ui.menu();}
+ command(code){if(code==='KeyM'){const s=this.save.data.settings;const muted=!s.sound&&!s.music;s.music=muted;s.sound=muted;this.save.saveGame();this.ui.toast(muted?'Звук включён':'Звук выключен');}if(code==='Escape'){if(this.state==='playing')this.pause();else if(this.state==='paused')this.resume();else if(this.state==='cutscene')this.skipScene();}if(code==='KeyR'&&['playing','paused'].includes(this.state))this.load(this.level.id);}
+ complete(){const result=this.level.result();this.save.complete(this.level.id,result.stars,result.score,result.time);this.state='complete';this.input.clear();this.audio.play('win');this.ui.result(result);}
+ fail(){this.state='failed';this.input.clear();this.audio.play('death');this.ui.failed();}
+ frame(time){const dt=Math.min(.05,(time-this.last)/1000||0);this.last=time;const frozen=['paused','settingsPause'].includes(this.state);if(!frozen)this.visualTime+=dt;this.audio.update(dt,frozen?'pause':this.state==='menu'||this.state==='levels'||this.state==='help'||this.state==='settings'?'menu':'game');
+ if(this.state==='playing'){this.accumulator+=dt;let steps=0;while(this.accumulator>=CONFIG.step&&steps++<8&&this.state==='playing'){const outcome=this.level.update(CONFIG.step,this.input);this.input.end();this.accumulator-=CONFIG.step;if(outcome==='complete')this.complete();if(outcome==='failed')this.fail();}this.camera.update(dt,this.level,this.renderer.w,this.renderer.h);this.ui.updateHUD();}else if(this.state==='cutscene'&&this.cutscene){this.cutscene.time+=dt;this.ui.updateCutscene();if(this.cutscene.time>=this.cutscene.duration)this.skipScene();}
+ if(['playing','paused','settingsPause','complete','failed'].includes(this.state)&&this.level)this.renderer.game(this.level,this.camera,this.visualTime);else this.renderer.menu(this.visualTime,this.state==='cutscene'?this.cutscene:null);requestAnimationFrame(t=>this.frame(t));}
+ run(){this.ui=new UIManager(this);this.ui.menu();requestAnimationFrame(t=>this.frame(t));}
+}
